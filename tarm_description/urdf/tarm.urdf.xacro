@@ -3,6 +3,7 @@
 
 	<xacro:include filename="$(find tarm_description)/urdf/materials.xacro"/>
 	<xacro:include filename="$(find tarm_description)/urdf/tarm.gazebo.xacro"/>
+	<xacro:include filename="$(find tarm_description)/urdf/tarm.transmission.xacro"/>
 
 	<!-- Properties -->
     <xacro:property name="PI" value="3.1415926535897931"/>

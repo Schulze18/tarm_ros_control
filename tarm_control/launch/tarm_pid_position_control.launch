@@ -1,0 +1,19 @@
+<launch>
+
+    <!-- Load Controller Parameters -->
+    <rosparam file="$(find tarm_control)/config/pid_position_control.yaml" command="load" />
+
+    <!-- Start Robot on Simulation -->
+    <include file="$(find tarm_description)/launch/tarm_empty.launch" />
+    
+    <!-- Start Controller Manager and Controllers -->
+    <node name="tarm_controller_manager" pkg="controller_manager" type="spawner" 
+    respawn="false" output="screen" args="joint_state_controller upper_arm_position_controller lower_arm_position_controller" />
+
+    <!-- Start Robot State Publisher -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+
+    <!-- Open Rviz -->
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find tarm_control)/rviz/control.rviz" />
+
+</launch>
