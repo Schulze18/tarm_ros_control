@@ -1,0 +1,10 @@
+# Publish all joint states -----------------------------------
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 50 
+  
+# Position Feedforward Controllers ---------------------------
+position_feedforward_controller:
+  type: tarm_controllers/PositionFeedforwardEffortController
+  joints: ['lower_arm_joint', upper_arm_joint]
+  pid: {p: 20.0, i: 0.01, d: 1.0}

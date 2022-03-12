@@ -1,0 +1,5 @@
+<library path="lib/libposition_feedforward_controller_lib">
+	<class name="tarm_controllers/PositionFeedforwardEffortController"
+		type="tarm_controllers::PositionFeedforwardEffortController" 
+		base_class_type="controller_interface::ControllerBase" />
+</library>
