@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   dynamic_reconfigure
+  realtime_tools
 )
 
 ## System dependencies are found with CMake's conventions

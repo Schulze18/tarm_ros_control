@@ -3,6 +3,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <control_toolbox/pid.h>
 #include <std_msgs/Float64MultiArray.h>
+#include <realtime_tools/realtime_publisher.h>
 
 namespace tarm_controllers{
 
@@ -22,13 +23,21 @@ namespace tarm_controllers{
             void computeInverseDynamics();
 
             void commandCallback(const std_msgs::Float64MultiArrayConstPtr &msg);
+
+            void publishPosition();
         
         private:
             std::vector<hardware_interface::JointHandle> joints_hw;
-            std::vector<control_toolbox::Pid> pid_controller;
+            std::vector<control_toolbox::Pid> pid_controllers;
+            
+            // ROS
             ros::Subscriber command_subscriber;
+            std::shared_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray> > position_publisher;
+            std_msgs::Float64MultiArray position_msg;
+
             // Joints Vector
             static const int num_joints = 2; 
+            std::vector<std::string> joint_name;
             std::vector<double> joint_feedforward_torques;
             std::vector<double> commanded_effort;
             std::vector<double> joint_position;
@@ -40,16 +49,11 @@ namespace tarm_controllers{
             std::vector<double> error;
             std::vector<double> error_old;
             std::vector<double> error_dot;
-            std::vector<double> joint_delt_cmd;
-            // Tool Data
-            double tool_position[2];
-            double tool_velocity[2];
-            double tool_reference_position[2];
-            double tool_jacobian[2][2];
-            double constant[2];
+            
             // EoM Matrices
             double M[num_joints][num_joints];
             double V[num_joints];
+            
             // Robot Parameters
             double m1, m2;
             double ac1, ac2;

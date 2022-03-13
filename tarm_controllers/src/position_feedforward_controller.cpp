@@ -9,33 +9,24 @@ namespace tarm_controllers{
 
     bool PositionFeedforwardEffortController::init(hardware_interface::EffortJointInterface* hw, ros::NodeHandle &nh){
 
-        // Get Yaml parameters
-        XmlRpc::XmlRpcValue joints_name, pid_gains;
-        // nh.getParam("joints", joints_name);
-        // nh.getParam("pid", pid_gains);
-
-        if (!nh.getParam("joints", joints_name)){
+        // Get Joints Names
+        if (!nh.getParam("joints", joint_name)){
             ROS_ERROR("Empty Joints List");
             return false;
         }
-        if (!nh.getParam("pid", pid_gains)){
-            ROS_ERROR("Empty PID Gains");
-            return false;
-        }
+        ROS_WARN("Number of joints %ld", joint_name.size());
 
-        ROS_WARN("Number of joints %d", joints_name.size());
-
-        if (num_joints < joints_name.size()){
+        if (num_joints < joint_name.size()){
             ROS_ERROR("Missing joints name");
             return false;
         }
-        else if (num_joints > joints_name.size()){
-            ROS_ERROR("Defined names excced limit of %d", joints_name.size());
+        else if (num_joints > joint_name.size()){
+            ROS_ERROR("Defined names excced limit of %ld", joint_name.size());
             return false;
         }
 
         // Resize data
-        pid_controller.resize(num_joints);
+        pid_controllers.resize(num_joints);
         joint_feedforward_torques.resize(num_joints);
         commanded_effort.resize(num_joints);
         joint_position.resize(num_joints);
@@ -48,22 +39,25 @@ namespace tarm_controllers{
         error_old.resize(num_joints);
         error_dot.resize(num_joints);
         joints_hw.resize(num_joints);
+        position_msg.data.resize(num_joints);
+
+        // Get joint handles and init PID controllers
         for (int i = 0; i < num_joints; i++){
-            joints_hw[i] = hw->getHandle(joints_name[i]);
-            pid_controller[i].initPid(pid_gains["p"], pid_gains["i"], pid_gains["d"], 10000, -10000); 
+            joints_hw[i] = hw->getHandle(joint_name[i]);
+            if(!pid_controllers[i].init(ros::NodeHandle(nh, joint_name[i] + "/pid"))){
+                ROS_ERROR("Missing PID gains of %s", joint_name[i].c_str());
+                return false;  
+            }
         }
         
-        command_subscriber = nh.subscribe<std_msgs::Float64MultiArray>("command", 1, &PositionFeedforwardEffortController::commandCallback, this);
-
-        // joint_reference_position[0] = 0.2;
-        // joint_reference_position[1] = 0.2; 
+        // Initialize with null reference
         for (int i = 0; i < num_joints; i++){
             joint_reference_position[i] = 0;
             joint_reference_velocity[i] = 0;
             joint_reference_acc[i] = 0;
         }
 
-        // Parameters
+        // Robot Parameters
         m1 = 1.0;
         m2 = 1.0;
         a1 = 0.8;
@@ -72,6 +66,10 @@ namespace tarm_controllers{
         ac2 = a2/2;
         gravity = 9.81;
 
+        // ROS
+        position_publisher.reset(new realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray>(nh, "state", 100));
+        command_subscriber = nh.subscribe<std_msgs::Float64MultiArray>("command", 1, &PositionFeedforwardEffortController::commandCallback, this);
+ 
         return true;
     }
 
@@ -88,7 +86,7 @@ namespace tarm_controllers{
     void PositionFeedforwardEffortController::starting(const ros::Time& time) { 
         
         for (int i = 0; i < num_joints; i++){
-            pid_controller[i].reset();
+            pid_controllers[i].reset();
         }
     
     }
@@ -102,7 +100,6 @@ namespace tarm_controllers{
 
             // Compute Error
             error[i] =  joint_reference_position[i] - joint_position[i];
-            // error_dot[i] = joint_reference_velocity[i] - joint_velocity[i];
             error_dot[i] = (error[i] - error_old[i]) / period.toSec();
         }
 
@@ -112,16 +109,20 @@ namespace tarm_controllers{
         // Compute Effort
         computeInverseDynamics();
 
+        // Update Command
         for (int i = 0; i < num_joints; i++){
 
-            commanded_effort[i] = joint_feedforward_torques[i] + pid_controller[i].computeCommand(error[i], error_dot[i], period);
+            commanded_effort[i] = joint_feedforward_torques[i] + pid_controllers[i].computeCommand(error[i], error_dot[i], period);
             
-            //ROS_INFO("Joint #%d Command %f", i, commanded_effort[i]);
             joints_hw[i].setCommand(commanded_effort[i]);
             
-            // Store old error
+            // Save old error
             error_old[i] = error[i];
         }
+
+        // Publish Current Joint Position
+        publishPosition();
+
     }
 
     void PositionFeedforwardEffortController::updateDynamics(){
@@ -144,7 +145,20 @@ namespace tarm_controllers{
         for (int i = 0; i < num_joints; i++){
             joint_feedforward_torques[i] = M[i][0]*joint_reference_acc[0] + M[i][1]*joint_reference_acc[1] + V[i]; 
         }
-
     }
 
+    void PositionFeedforwardEffortController::publishPosition(){
+
+        // Update Data
+        for (int i = 0; i < num_joints; i++){
+            position_msg.data[i] = joint_position[i];
+        }
+
+        // Publish
+        if (position_publisher->trylock()){
+            position_publisher->msg_ = position_msg;
+            position_publisher->unlockAndPublish();
+        }
+    }
+    
 }
